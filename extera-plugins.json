@@ -11,13 +11,13 @@
       "name": "Status Probe",
       "description": "Telegram user status monitoring",
       "author": "emui-git",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "app_version": ">=12.5.1",
       "sdk_version": ">=1.4.4.3",
       "category": "tools",
       "file": "status_probe.plugin",
-      "sha256": "8103df6ca4bfa2c933ff532bdd40cf6b79dda339610c8a071968bd1eaa324df6",
-      "size": 2165
+      "sha256": "3280772fada04622793e6242ad71cc4cef4dafc13887d86a6dd734f3349d9bc0",
+      "size": 5332
     }
   ]
 }
