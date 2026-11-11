@@ -4,7 +4,7 @@ from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
 __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Telegram user status monitoring"
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -31,31 +31,26 @@ class StatusProbe(BasePlugin):
 
     def handle_profile_click(self, context):
         self.logger.info("STATUS PROBE: Profile menu clicked")
-        self.logger.info("Context type: %s", type(context).__name__)
-        self.logger.dump(context)
-
-        try:
-            self.logger.info(
-                "Context keys: %s",
-                list(context.keySet())
-            )
-        except Exception as e:
-            self.logger.info("keySet error: %s", str(e))
 
         try:
             user = context.get("user")
-            self.logger.info("User object: %s", user)
-            self.logger.dump(user)
-
             user_id = getattr(user, "id", None)
+            status = getattr(user, "status", None)
 
-            if user_id is None:
-                user_id = context.get("userId")
+            self.logger.info("User ID: %s", user_id)
+            self.logger.info(
+                "Status type: %s",
+                type(status).__name__ if status is not None else "None"
+            )
 
-            self.logger.info("Selected user ID: %s", user_id)
+            if status is not None:
+                self.logger.info(
+                    "Status expires: %s",
+                    getattr(status, "expires", None)
+                )
 
         except Exception as e:
-            self.logger.warning("Context read error: %s", str(e))
+            self.logger.warning("Profile read error: %s", str(e))
 
     def on_update_hook(self, update_name, account, update):
         if update_name == "TL_updateUserStatus":
@@ -63,7 +58,14 @@ class StatusProbe(BasePlugin):
                 "STATUS UPDATE: User ID %s",
                 update.user_id
             )
-            self.logger.dump(update.status)
+
+            status = getattr(update, "status", None)
+
+            if status is not None:
+                self.logger.info(
+                    "STATUS UPDATE: Type %s, expires %s",
+                    type(status).__name__,
+                    getattr(status, "expires", None)
+                )
 
         return HookResult()
-
