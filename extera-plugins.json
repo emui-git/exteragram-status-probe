@@ -1,0 +1,23 @@
+
+{
+  "schema": 1,
+  "name": "ExteraGram Status Probe",
+  "description": "Diagnostic plugin for Telegram user status monitoring",
+  "author": "emui-git",
+  "homepage": "https://github.com/emui-git/exteragram-status-probe",
+  "plugins": [
+    {
+      "id": "status_probe",
+      "name": "Status Probe",
+      "description": "Diagnostic Telegram status update monitor",
+      "author": "emui-git",
+      "version": "0.1.0",
+      "app_version": ">=12.5.1",
+      "sdk_version": ">=1.4.4.3",
+      "category": "tools",
+      "file": "status_probe.plugin",
+      "sha256": "d12623b525f77861547a8f224433bcadb86e0c03650b906135fbaad082b78658",
+      "size": 1298
+    }
+  ]
+}
