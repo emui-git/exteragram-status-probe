@@ -5,6 +5,7 @@ __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Diagnostic Telegram status update monitor"
 __version__ = "0.1.0"
+__category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
 
