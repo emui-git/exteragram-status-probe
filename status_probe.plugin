@@ -4,7 +4,7 @@ from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
 __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Telegram user status monitoring"
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -17,7 +17,7 @@ class StatusProbe(BasePlugin):
 
         self.add_hook("TL_updateUserStatus")
 
-        self.profile_item_id = self.add_menu_item(
+        self.add_menu_item(
             MenuItemData(
                 menu_type=MenuItemType.PROFILE_ACTION_MENU,
                 text="Начать отслеживание",
@@ -31,23 +31,39 @@ class StatusProbe(BasePlugin):
 
     def handle_profile_click(self, context):
         self.logger.info("STATUS PROBE: Profile menu clicked")
-        self.logger.info("Context keys: %s", list(context.keys()))
+        self.logger.info("Context type: %s", type(context).__name__)
+        self.logger.dump(context)
 
-        user = context.get("user")
-        user_id = getattr(user, "id", None)
+        try:
+            self.logger.info(
+                "Context keys: %s",
+                list(context.keySet())
+            )
+        except Exception as e:
+            self.logger.info("keySet error: %s", str(e))
 
-        if user_id is None:
-            user_id = context.get("userId")
-
-        if user_id is not None:
-            self.logger.info("Selected user ID: %s", user_id)
-        else:
-            self.logger.warning("Could not determine selected user ID")
+        try:
+            user = context.get("user")
+            self.logger.info("User object: %s", user)
             self.logger.dump(user)
+
+            user_id = getattr(user, "id", None)
+
+            if user_id is None:
+                user_id = context.get("userId")
+
+            self.logger.info("Selected user ID: %s", user_id)
+
+        except Exception as e:
+            self.logger.warning("Context read error: %s", str(e))
 
     def on_update_hook(self, update_name, account, update):
         if update_name == "TL_updateUserStatus":
-            self.logger.info("STATUS UPDATE: User ID %s", update.user_id)
+            self.logger.info(
+                "STATUS UPDATE: User ID %s",
+                update.user_id
+            )
             self.logger.dump(update.status)
 
         return HookResult()
+
