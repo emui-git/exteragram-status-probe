@@ -11,7 +11,7 @@
       "name": "Status Probe",
       "description": "Telegram user status monitoring",
       "author": "emui-git",
-      "version": "0.2.1",
+      "version": "0.2.3",
       "app_version": ">=12.5.1",
       "sdk_version": ">=1.4.4.3",
       "category": "tools",
