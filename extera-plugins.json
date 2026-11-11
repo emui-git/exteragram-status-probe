@@ -16,8 +16,8 @@
       "sdk_version": ">=1.4.4.3",
       "category": "tools",
       "file": "status_probe.plugin",
-      "sha256": "7d182fa888b6debb48b9f93c1975137c1f4c2678273855494facb6e216d4bde8",
-      "size": 2006
+      "sha256": "8103df6ca4bfa2c933ff532bdd40cf6b79dda339610c8a071968bd1eaa324df6",
+      "size": 2165
     }
   ]
 }
