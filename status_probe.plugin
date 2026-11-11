@@ -1,10 +1,10 @@
 
-from base_plugin import BasePlugin, HookResult
+from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
 
 __id__ = "status_probe"
 __name__ = "Status Probe"
-__description__ = "Diagnostic Telegram status update monitor"
-__version__ = "0.1.0"
+__description__ = "Telegram user status monitoring"
+__version__ = "0.2.0"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -17,29 +17,37 @@ class StatusProbe(BasePlugin):
 
         self.add_hook("TL_updateUserStatus")
 
-        self.logger.info(
-            "STATUS PROBE: Registered TL_updateUserStatus hook"
+        self.profile_item_id = self.add_menu_item(
+            MenuItemData(
+                menu_type=MenuItemType.PROFILE_ACTION_MENU,
+                text="Начать отслеживание",
+                on_click=self.handle_profile_click,
+                icon="msg_info",
+                priority=10,
+            )
         )
+
+        self.logger.info("STATUS PROBE: Profile menu item registered")
+
+    def handle_profile_click(self, context):
+        self.logger.info("STATUS PROBE: Profile menu clicked")
+        self.logger.info("Context keys: %s", list(context.keys()))
+
+        user = context.get("user")
+        user_id = getattr(user, "id", None)
+
+        if user_id is None:
+            user_id = context.get("userId")
+
+        if user_id is not None:
+            self.logger.info("Selected user ID: %s", user_id)
+        else:
+            self.logger.warning("Could not determine selected user ID")
+            self.logger.dump(user)
 
     def on_update_hook(self, update_name, account, update):
         if update_name == "TL_updateUserStatus":
-            self.logger.info("STATUS PROBE: Status update received")
-            self.logger.info("User ID: %s", update.user_id)
-
-            status = getattr(update, "status", None)
-
-            if status is not None:
-                try:
-                    self.logger.info(
-                        "Status class: %s",
-                        status.getClass().getSimpleName()
-                    )
-                except Exception:
-                    self.logger.info(
-                        "Status type: %s",
-                        type(status).__name__
-                    )
-
-                self.logger.dump(status)
+            self.logger.info("STATUS UPDATE: User ID %s", update.user_id)
+            self.logger.dump(update.status)
 
         return HookResult()
