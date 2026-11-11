@@ -5,11 +5,15 @@ import time
 
 from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
 from file_utils import get_plugins_dir, ensure_dir_exists, read_file, write_file
+from ui.alert import AlertDialogBuilder
+from client_utils import get_last_fragment
+from datetime import datetime
+from android_utils import run_on_ui_thread
 
 __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Telegram user status monitoring"
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -41,6 +45,16 @@ class StatusProbe(BasePlugin):
                 on_click=self.handle_profile_click,
                 icon="msg_info",
                 priority=10,
+            )
+        )
+
+        self.add_menu_item(
+            MenuItemData(
+                menu_type=MenuItemType.PROFILE_ACTION_MENU,
+                text="История активности",
+                on_click=self.handle_history_click,
+                icon="msg_stats",
+                priority=11,
             )
         )
 
@@ -196,3 +210,114 @@ class StatusProbe(BasePlugin):
                 )
 
         return HookResult()
+
+    def format_duration(self, seconds):
+        seconds = int(seconds)
+
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+
+        if hours:
+            return f"{hours} ч. {minutes} мин."
+
+        if minutes:
+            return f"{minutes} мин. {secs} сек."
+
+        return f"{secs} сек."
+
+    def handle_history_click(self, context):
+        try:
+            user = context.get("user")
+            user_id = getattr(user, "id", None)
+
+            if user_id is None:
+                return
+
+            user_data = self.data.get(
+                "users", {}
+            ).get(str(user_id))
+
+            if not user_data:
+                message = "История для этого пользователя пока пуста."
+            else:
+                sessions = user_data.get("sessions", [])
+                total = sum(
+                    session.get("duration", 0)
+                    for session in sessions
+                )
+
+                state = user_data.get("last_state")
+                active_since = user_data.get("active_since")
+
+                if state == "online":
+                    status_text = "Сейчас онлайн"
+                    if active_since:
+                        current_duration = max(
+                            0, int(time.time()) - active_since
+                        )
+                        total += current_duration
+                else:
+                    status_text = "Сейчас офлайн"
+
+                lines = [
+                    f"Статус: {status_text}",
+                    f"Всего сессий: {len(sessions)}",
+                    f"Общее время онлайн: {self.format_duration(total)}",
+                    "",
+                    "Последние сессии:"
+                ]
+
+                for session in reversed(sessions[-20:]):
+                    started = datetime.fromtimestamp(
+                        session["started_at"]
+                    ).strftime("%d.%m.%Y %H:%M:%S")
+
+                    ended = datetime.fromtimestamp(
+                        session["ended_at"]
+                    ).strftime("%d.%m.%Y %H:%M:%S")
+
+                    duration = self.format_duration(
+                        session.get("duration", 0)
+                    )
+
+                    lines.append(
+                        f"{started} — {ended}\n"
+                        f"Длительность: {duration}"
+                    )
+
+                if not sessions:
+                    lines.append("Завершённых сессий пока нет.")
+
+                message = "\n\n".join(lines)
+
+            def show_dialog():
+                fragment = get_last_fragment()
+
+                if not fragment:
+                    self.logger.warning(
+                        "Cannot show history: no fragment"
+                    )
+                    return
+
+                activity = fragment.getParentActivity()
+
+                if not activity:
+                    self.logger.warning(
+                        "Cannot show history: no activity"
+                    )
+                    return
+
+                builder = AlertDialogBuilder(activity)
+                builder.set_title("История активности")
+                builder.set_message(message)
+                builder.set_positive_button(
+                    "Закрыть",
+                    lambda dialog, which: dialog.dismiss()
+                )
+                builder.show()
+
+            run_on_ui_thread(show_dialog)
+
+        except Exception:
+            self.logger.exception("History display error")
