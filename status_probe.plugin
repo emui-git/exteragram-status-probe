@@ -1,10 +1,15 @@
 
+import os
+import json
+import time
+
 from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
+from file_utils import get_plugins_dir, ensure_dir_exists, read_file, write_file
 
 __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Telegram user status monitoring"
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -15,7 +20,17 @@ class StatusProbe(BasePlugin):
     def on_plugin_load(self):
         self.logger.info("STATUS PROBE: Plugin loaded")
 
-        self.tracked_user_id = None
+        self.data_dir = os.path.join(
+            get_plugins_dir(), "status_probe_data"
+        )
+        ensure_dir_exists(self.data_dir)
+
+        self.data_path = os.path.join(
+            self.data_dir, "history.json"
+        )
+
+        self.data = self.load_data()
+        self.tracked_user_id = self.data.get("tracked_user_id")
 
         self.add_hook("TL_updateUserStatus")
 
@@ -29,7 +44,45 @@ class StatusProbe(BasePlugin):
             )
         )
 
-        self.logger.info("STATUS PROBE: Profile menu item registered")
+        self.logger.info("STATUS PROBE: Ready")
+
+    def load_data(self):
+        try:
+            content = read_file(self.data_path)
+
+            if content:
+                data = json.loads(content)
+                self.logger.info("History loaded")
+                return data
+
+        except Exception:
+            self.logger.exception("History load error")
+
+        return {
+            "tracked_user_id": None,
+            "users": {}
+        }
+
+    def save_data(self):
+        try:
+            write_file(
+                self.data_path,
+                json.dumps(self.data, ensure_ascii=False)
+            )
+        except Exception:
+            self.logger.exception("History save error")
+
+    def get_user_data(self, user_id):
+        users = self.data.setdefault("users", {})
+
+        return users.setdefault(
+            str(user_id),
+            {
+                "last_state": None,
+                "active_since": None,
+                "sessions": []
+            }
+        )
 
     def handle_profile_click(self, context):
         try:
@@ -40,32 +93,106 @@ class StatusProbe(BasePlugin):
                 self.logger.warning("User ID not found")
                 return
 
-            self.tracked_user_id = user_id
+            self.tracked_user_id = str(user_id)
+            self.data["tracked_user_id"] = self.tracked_user_id
+
+            self.save_data()
+
+            self.logger.info(
+                "Tracking started: %s", user_id
+            )
 
             status = getattr(user, "status", None)
 
-            self.logger.info("Tracking started: %s", user_id)
-            self.logger.info(
-                "Current status: %s, expires: %s",
-                type(status).__name__ if status else "None",
-                getattr(status, "expires", None)
+            self.process_status(
+                user_id,
+                status,
+                "profile"
             )
 
-        except Exception as e:
-            self.logger.warning("Profile read error: %s", str(e))
+        except Exception:
+            self.logger.exception("Profile read error")
+
+    def process_status(self, user_id, status, source):
+        if status is None:
+            return
+
+        status_type = type(status).__name__
+
+        if status_type.endswith("Online"):
+            new_state = "online"
+        elif status_type.endswith("Offline"):
+            new_state = "offline"
+        else:
+            self.logger.info(
+                "Status not precise: %s", status_type
+            )
+            return
+
+        user_data = self.get_user_data(user_id)
+        old_state = user_data.get("last_state")
+        now = int(time.time())
+
+        if old_state == new_state:
+            return
+
+        if new_state == "online":
+            user_data["active_since"] = now
+            user_data["last_state"] = "online"
+
+            self.logger.info(
+                "ONLINE: user %s, time %s",
+                user_id, now
+            )
+
+        elif new_state == "offline":
+            started = user_data.get("active_since")
+
+            if started is not None:
+                duration = max(0, now - started)
+
+                session = {
+                    "started_at": started,
+                    "ended_at": now,
+                    "duration": duration
+                }
+
+                sessions = user_data.setdefault(
+                    "sessions", []
+                )
+                sessions.append(session)
+
+                # Keep the latest 500 sessions
+                user_data["sessions"] = sessions[-500:]
+
+                self.logger.info(
+                    "OFFLINE: user %s, duration %s seconds",
+                    user_id, duration
+                )
+            else:
+                self.logger.info(
+                    "OFFLINE: user %s", user_id
+                )
+
+            user_data["active_since"] = None
+            user_data["last_state"] = "offline"
+
+        self.save_data()
 
     def on_update_hook(self, update_name, account, update):
         if update_name == "TL_updateUserStatus":
             user_id = getattr(update, "user_id", None)
 
-            if user_id == self.tracked_user_id:
+            if (
+                user_id is not None
+                and str(user_id) == str(self.tracked_user_id)
+            ):
                 status = getattr(update, "status", None)
 
-                self.logger.info(
-                    "TRACKED USER STATUS: ID %s, type %s, expires %s",
+                self.process_status(
                     user_id,
-                    type(status).__name__ if status else "None",
-                    getattr(status, "expires", None)
+                    status,
+                    "update"
                 )
 
         return HookResult()
