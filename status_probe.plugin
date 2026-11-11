@@ -4,7 +4,7 @@ from base_plugin import BasePlugin, HookResult, MenuItemData, MenuItemType
 __id__ = "status_probe"
 __name__ = "Status Probe"
 __description__ = "Telegram user status monitoring"
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 __category__ = "tools"
 __app_version__ = ">=12.5.1"
 __sdk_version__ = ">=1.4.4.3"
@@ -14,6 +14,8 @@ class StatusProbe(BasePlugin):
 
     def on_plugin_load(self):
         self.logger.info("STATUS PROBE: Plugin loaded")
+
+        self.tracked_user_id = None
 
         self.add_hook("TL_updateUserStatus")
 
@@ -30,41 +32,39 @@ class StatusProbe(BasePlugin):
         self.logger.info("STATUS PROBE: Profile menu item registered")
 
     def handle_profile_click(self, context):
-        self.logger.info("STATUS PROBE: Profile menu clicked")
-
         try:
             user = context.get("user")
             user_id = getattr(user, "id", None)
+
+            if user_id is None:
+                self.logger.warning("User ID not found")
+                return
+
+            self.tracked_user_id = user_id
+
             status = getattr(user, "status", None)
 
-            self.logger.info("User ID: %s", user_id)
+            self.logger.info("Tracking started: %s", user_id)
             self.logger.info(
-                "Status type: %s",
-                type(status).__name__ if status is not None else "None"
+                "Current status: %s, expires: %s",
+                type(status).__name__ if status else "None",
+                getattr(status, "expires", None)
             )
-
-            if status is not None:
-                self.logger.info(
-                    "Status expires: %s",
-                    getattr(status, "expires", None)
-                )
 
         except Exception as e:
             self.logger.warning("Profile read error: %s", str(e))
 
     def on_update_hook(self, update_name, account, update):
         if update_name == "TL_updateUserStatus":
-            self.logger.info(
-                "STATUS UPDATE: User ID %s",
-                update.user_id
-            )
+            user_id = getattr(update, "user_id", None)
 
-            status = getattr(update, "status", None)
+            if user_id == self.tracked_user_id:
+                status = getattr(update, "status", None)
 
-            if status is not None:
                 self.logger.info(
-                    "STATUS UPDATE: Type %s, expires %s",
-                    type(status).__name__,
+                    "TRACKED USER STATUS: ID %s, type %s, expires %s",
+                    user_id,
+                    type(status).__name__ if status else "None",
                     getattr(status, "expires", None)
                 )
 
